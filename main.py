@@ -85,13 +85,24 @@ def main():
         except Exception:
             output_text += "- Unable to load signals.json."
 
+    # Derive repo name from REPO_PATH and write to output/{repo}.md with H1 header
+    repo_path = os.getenv("REPO_PATH", ".")
+    repo_slug = os.path.basename(os.path.abspath(repo_path)) or "repository"
+    def prettify(name: str) -> str:
+        import re
+        parts = re.split(r"[-_\s]+", name)
+        return " ".join(w.capitalize() for w in parts if w)
+    repo_title = prettify(repo_slug)
+
     os.makedirs("output", exist_ok=True)
-    with open("output/bullets.md","w") as f:
-        f.write(output_text + "\n")
+    output_file = os.path.join("output", f"{repo_slug}.md")
+    content = f"# {repo_title}\n\n" + (output_text or "") + "\n"
+    with open(output_file, "w") as f:
+        f.write(content)
 
     if verbose:
         print("Signals saved to output/signals.json")
-        print("Bullets saved to output/bullets.md")
+        print(f"Bullets saved to {output_file}")
 
 if __name__ == "__main__":
     main()
