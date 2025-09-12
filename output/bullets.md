@@ -1,6 +1,4 @@
-- Implemented a new authentication architecture, reducing login time by 30% and enhancing both user experience and security.  
-- Optimized database queries, improving performance by 50% and enabling faster data retrieval.  
-- Developed a CI/CD pipeline that streamlined deployment processes, resulting in a 40% reduction in deployment time.  
-- Introduced security best practices, achieving a 60% reduction in security incidents and significantly strengthening application security.  
-- Led a cross-team data migration project, ensuring 100% data integrity post-migration with high accuracy.  
-- Mentored junior developers, increasing their productivity by 25% and enhancing overall team skills.
+[Offline mode] Could not run full CrewAI pipeline. Generated a minimal summary from local signals instead.
+
+- Authored 0 commits touching 0 files with +0/-0 LOC changes.
+- Language breakdown: go:26, py:1

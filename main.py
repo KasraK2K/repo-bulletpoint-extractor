@@ -1,10 +1,24 @@
 import os
+import argparse
 from dotenv import load_dotenv
 from crewai import Crew, Process
 from agents import ResearchAgent, AttributionAgent, SynthesisAgent, BulletEditor
 from tasks import make_tasks
 
 def main():
+    parser = argparse.ArgumentParser(description="Run Repo Insights CrewAI Assistant")
+    vg = parser.add_mutually_exclusive_group()
+    vg.add_argument("--verbose", action="store_true", help="Enable progress output")
+    vg.add_argument("--quiet", action="store_true", help="Suppress progress output")
+    args = parser.parse_args()
+
+    # default to verbose unless explicitly quiet
+    verbose = True
+    if args.quiet:
+        verbose = False
+    elif args.verbose:
+        verbose = True
+
     load_dotenv()
     # Disable telemetry in restricted environments
     os.environ.setdefault("OTEL_SDK_DISABLED", "true")
@@ -15,7 +29,7 @@ def main():
         "SynthesisAgent": SynthesisAgent,
         "BulletEditor": BulletEditor
     }
-    tasks, signals = make_tasks(agents)
+    tasks, signals = make_tasks(agents, verbose=verbose)
 
     crew = Crew(
         agents=[ResearchAgent, AttributionAgent, SynthesisAgent, BulletEditor],
@@ -24,16 +38,20 @@ def main():
         memory=False
     )
 
-    print("Initializing agents and tasks...", flush=True)
+    if verbose:
+        print("Initializing agents and tasks...", flush=True)
     # Attempt to run the crew; fall back to offline summary if environment blocks it
     try:
-        print("Starting CrewAI pipeline (sequential)...", flush=True)
+        if verbose:
+            print("Starting CrewAI pipeline (sequential)...", flush=True)
         result = crew.kickoff()
-        print("CrewAI pipeline completed.", flush=True)
+        if verbose:
+            print("CrewAI pipeline completed.", flush=True)
         output_text = str(result).strip()
     except Exception as e:
         # Offline/readonly/telemetry/network failures: degrade gracefully
-        print(f"CrewAI failed, falling back to offline summary: {e}", flush=True)
+        if verbose:
+            print(f"CrewAI failed, falling back to offline summary: {e}", flush=True)
         output_text = (
             "[Offline mode] Could not run full CrewAI pipeline. "
             "Generated a minimal summary from local signals instead.\n\n"
@@ -71,8 +89,9 @@ def main():
     with open("output/bullets.md","w") as f:
         f.write(output_text + "\n")
 
-    print("Signals saved to output/signals.json")
-    print("Bullets saved to output/bullets.md")
+    if verbose:
+        print("Signals saved to output/signals.json")
+        print("Bullets saved to output/bullets.md")
 
 if __name__ == "__main__":
     main()
