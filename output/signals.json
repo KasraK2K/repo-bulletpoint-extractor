@@ -1,0 +1,42 @@
+{
+  "commits_you": [],
+  "summary_you": {
+    "total_commits": 0,
+    "total_insertions": 0,
+    "total_deletions": 0,
+    "files_touched_count": 0,
+    "files_touched": []
+  },
+  "top_files_you": [],
+  "languages": {
+    "go": 26,
+    "py": 1
+  },
+  "components": {
+    "models": [
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/models/general.go",
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/models/user.go",
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/repository/models.go"
+    ],
+    "infrastructure": [
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/repository/db.go",
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/repository/models.go",
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/repository/permission_query.sql.go",
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/repository/role_query.sql.go",
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/repository/user_query.sql.go"
+    ],
+    "api": [
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/api/handlers/Handler.go",
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/api/handlers/user.handler.go",
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/api/middlewares/permission.middleware.go",
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/api/routes/router.go",
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/api/routes/user.route.go"
+    ],
+    "services": [
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/services/Service.go",
+      "/Users/kasrakarami/Home/WorkSpace/Projects/go-lms/internal/services/user.service.go"
+    ]
+  },
+  "issues": [],
+  "prs": []
+}

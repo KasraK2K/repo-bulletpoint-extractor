@@ -1,0 +1,101 @@
+import json, os, yaml
+from crewai import Task
+from tools.git_repo import load_git_history, contributions_by_user, summarize_impact, hot_files
+from tools.github_api import load_github_issues_prs
+from tools.code_scan import walk_code, language_breakdown, simple_component_detection
+
+def load_cfg():
+    with open("config.yaml","r") as f:
+        return yaml.safe_load(f)
+
+def collect_signals():
+    cfg = load_cfg()
+    repo_path = os.getenv("REPO_PATH", ".")
+    print(f"[1/4] Scanning git history for {repo_path}...", flush=True)
+    commits = load_git_history(
+        repo_path, cfg["git"]["since"], cfg["git"]["until"], cfg["git"]["include_merge_commits"]
+    )
+    yours, others = contributions_by_user(commits, cfg["you"]["aliases"], cfg["you"]["emails"])
+    base_summary = summarize_impact(yours)
+    top_files = hot_files(yours, top_n=cfg["analysis"]["hot_file_top_n"])
+    print(
+        f"  → Found {len(commits)} commits; yours: {len(yours)}; files touched: {base_summary.get('files_touched_count', 0)}",
+        flush=True,
+    )
+
+    print("[2/4] Analyzing codebase structure and languages...", flush=True)
+    files = walk_code(repo_path, cfg["analysis"]["languages_of_interest"], cfg["analysis"]["max_files"])
+    langs = language_breakdown(files)
+    components = simple_component_detection(files)
+    print(f"  → Considered {len(files)} files; languages: {', '.join(sorted(langs.keys()))}", flush=True)
+
+    print("[3/4] Fetching GitHub issues/PRs (if configured)...", flush=True)
+    owner = os.getenv("GITHUB_OWNER", "")
+    repo = os.getenv("GITHUB_REPO", "")
+    issues_prs = load_github_issues_prs(owner, repo)
+    print(
+        f"  → Issues: {len(issues_prs.get('issues', []))}, PRs: {len(issues_prs.get('prs', []))}",
+        flush=True,
+    )
+
+    payload = {
+        "commits_you": yours[-500:],            # cap for prompt size
+        "summary_you": base_summary,
+        "top_files_you": top_files,
+        "languages": langs,
+        "components": components,
+        "issues": issues_prs.get("issues", [])[:300],
+        "prs": issues_prs.get("prs", [])[:300]
+    }
+    os.makedirs("output", exist_ok=True)
+    with open("output/signals.json","w") as f:
+        json.dump(payload, f, indent=2)
+    print("[4/4] Signals saved to output/signals.json", flush=True)
+    return payload
+
+def make_tasks(agents):
+    cfg = load_cfg()
+    signals = collect_signals()
+
+    research = Task(
+        description=(
+            "Analyze repo signals and list candidate achievements attributable to Kasra. "
+            "Focus on: architecture decisions, performance/reliability wins, major features, tooling, CI/CD, security, data migrations, "
+            "mentoring/reviews, cross-team leadership. Provide evidence snippets and metrics."
+        ),
+        agent=agents["ResearchAgent"],
+        expected_output="A JSON with fields: achievements[], each has {title, evidence, metric_guess, files, time_window, area}"
+    )
+
+    attribution = Task(
+        description=(
+            "From research JSON, validate authorship using commits_you, PRs authored/assigned, and review activity. "
+            "Boost confidence when Kasra authored most diffs or was assignee/reviewer on merged PRs. "
+            "Return top 10 achievements with confidence scores and concrete metrics or reasonable estimates."
+        ),
+        agent=agents["AttributionAgent"],
+        context=[research],
+        expected_output="JSON with fields: validated_achievements[] {title, impact, metrics, confidence, proof_links?, proof_snippets}"
+    )
+
+    synthesis = Task(
+        description=(
+            "Turn validated achievements into STAR-shaped statements with tech stack and business impact. "
+            f"Target {cfg['output']['bullets_count']} bullets. Keep ≤30 words each. Prefer %/ms/$/throughput/user metrics."
+        ),
+        agent=agents["SynthesisAgent"],
+        context=[attribution],
+        expected_output="List of concise bullet points (plain text, one per line)."
+    )
+
+    editing = Task(
+        description=(
+            "Polish bullets per style config. Deduplicate, fix tense, unify terminology, and ensure measurability. "
+            "Use prompts/bulletpoint_system.txt and prompts/styles.md."
+        ),
+        agent=agents["BulletEditor"],
+        context=[synthesis],
+        expected_output="Final bullets ready for CV (plain text list)."
+    )
+
+    return [research, attribution, synthesis, editing], signals

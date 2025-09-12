@@ -1,0 +1,22 @@
+you:
+  full_name: "Kasra"
+  role: "Technical Lead / Software Architect"
+  aliases: ["Kasra", "K. Karami", "kasra.dev"]  # names/emails used in commits
+  emails:
+    - "kasra.karami.kkk@gmail.com"
+    - "kasra.karami.work@gmail.com"
+git:
+  since: "2023-01-01"     # limit analysis window
+  until: "2025-09-08"
+  include_merge_commits: true
+  detect_rewrites: true
+
+analysis:
+  max_files: 2000
+  hot_file_top_n: 50
+  detect_components: true
+  languages_of_interest: ["py","ts","tsx","js","go","java","kt","scala","rb","rs","cpp"]
+
+output:
+  bullets_count: 6
+  style: "senior_technical_lead"   # see prompts/styles.md
