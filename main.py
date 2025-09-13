@@ -4,6 +4,50 @@ from dotenv import load_dotenv
 from crewai import Crew, Process
 from agents import ResearchAgent, AttributionAgent, SynthesisAgent, BulletEditor
 from tasks import make_tasks
+from tools.git_repo import get_github_owner_repo
+
+def normalize_proof_links(text: str, owner: str, repo: str) -> str:
+    if not text or not owner or not repo:
+        return text
+    base = f"https://github.com/{owner}/{repo}/"
+    # Common placeholder bases used by LLMs or templates
+    placeholders = [
+        "https://github.com/project/repo/",
+        "https://github.com/your-org-or-username/your-repo-name/",
+        "https://github.com/org/repo/",
+        "https://github.com/owner/repo/",
+        "https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/",
+        "https://github.com/${owner}/${repo}/",
+        "https://github.com/<owner>/<repo>/",
+        "https://github.com/<ORG>/<REPO>/",
+    ]
+    for ph in placeholders:
+        text = text.replace(ph, base)
+    return text
+
+def sanitize_proof_links(text: str) -> str:
+    import re
+    if not text:
+        return text
+    def repl(m):
+        url = m.group(1)
+        # Accept commit links with hex sha and PR links with digits only
+        if "/commit/" in url:
+            sha = url.rsplit("/commit/", 1)[-1].split("/", 1)[0]
+            if re.fullmatch(r"[0-9a-fA-F]{7,40}", sha):
+                return m.group(0)
+            return ""  # drop invalid placeholder commit link
+        if "/pull/" in url:
+            num = url.rsplit("/pull/", 1)[-1].split("/", 1)[0]
+            if re.fullmatch(r"\d+", num):
+                return m.group(0)
+            return ""
+        # Unknown pattern; keep as-is
+        return m.group(0)
+    text = re.sub(r"\[Proof\]\(([^)]+)\)", repl, text)
+    # Collapse repeated spaces/tabs but keep newlines intact
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text
 
 def main():
     parser = argparse.ArgumentParser(description="Run Repo Insights CrewAI Assistant")
@@ -93,6 +137,15 @@ def main():
         parts = re.split(r"[-_\s]+", name)
         return " ".join(w.capitalize() for w in parts if w)
     repo_title = prettify(repo_slug)
+
+    # Normalize proof links: prefer owner/repo derived from git remote; fallback to env
+    guess_owner, guess_repo = get_github_owner_repo(repo_path)
+    env_owner = os.getenv("GITHUB_OWNER", "").strip()
+    env_repo = os.getenv("GITHUB_REPO", "").strip()
+    owner = (guess_owner or env_owner or "").strip()
+    repo = (guess_repo or env_repo or "").strip()
+    output_text = normalize_proof_links(output_text, owner, repo)
+    output_text = sanitize_proof_links(output_text)
 
     os.makedirs("output", exist_ok=True)
     output_file = os.path.join("output", f"{repo_slug}.md")

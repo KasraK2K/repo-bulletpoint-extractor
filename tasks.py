@@ -1,6 +1,6 @@
 import json, os, yaml
 from crewai import Task
-from tools.git_repo import load_git_history, contributions_by_user, summarize_impact, hot_files
+from tools.git_repo import load_git_history, contributions_by_user, summarize_impact, hot_files, get_github_owner_repo
 from tools.github_api import load_github_issues_prs
 from tools.code_scan import walk_code, language_breakdown, simple_component_detection
 
@@ -64,11 +64,30 @@ def make_tasks(agents, verbose: bool = True):
     cfg = load_cfg()
     signals = collect_signals(verbose=verbose)
 
+    # Determine GitHub base URL for proof links
+    repo_path = os.getenv("REPO_PATH", ".")
+    env_owner = os.getenv("GITHUB_OWNER", "").strip()
+    env_repo = os.getenv("GITHUB_REPO", "").strip()
+    guess_owner, guess_repo = get_github_owner_repo(repo_path)
+    owner = (guess_owner or env_owner or "").strip()
+    repo = (guess_repo or env_repo or "").strip()
+    if owner and repo:
+        github_base = f"https://github.com/{owner}/{repo}/"
+        base_instruction = (
+            f"Use full GitHub links with base {github_base} (commit/<hash> or pull/<number>)."
+        )
+    else:
+        github_base = ""
+        base_instruction = (
+            "Use full GitHub links to commits or PRs from the repository's GitHub remote; avoid placeholders."
+        )
+
     research = Task(
         description=(
             "Analyze repo signals and list candidate achievements attributable to Kasra. "
             "Focus on: architecture decisions, performance/reliability wins, major features, tooling, CI/CD, security, data migrations, "
-            "mentoring/reviews, cross-team leadership. Provide evidence snippets and metrics."
+            "mentoring/reviews, cross-team leadership. Provide evidence snippets and metrics. "
+            + base_instruction
         ),
         agent=agents["ResearchAgent"],
         expected_output="A JSON with fields: achievements[], each has {title, evidence, metric_guess, files, time_window, area}"
@@ -78,17 +97,21 @@ def make_tasks(agents, verbose: bool = True):
         description=(
             "From research JSON, validate authorship using commits_you, PRs authored/assigned, and review activity. "
             "Boost confidence when Kasra authored most diffs or was assignee/reviewer on merged PRs. "
-            "Return top 10 achievements with confidence scores and concrete metrics or reasonable estimates."
+            "Return top 10 achievements with confidence scores and concrete metrics or reasonable estimates. "
+            "Include proof_links as full URLs to commits or PRs in the repository's GitHub. "
+            + base_instruction
         ),
         agent=agents["AttributionAgent"],
         context=[research],
-        expected_output="JSON with fields: validated_achievements[] {title, impact, metrics, confidence, proof_links?, proof_snippets}"
+        expected_output=("JSON with fields: validated_achievements[] {title, impact, metrics, confidence, proof_links?, proof_snippets}")
     )
 
     synthesis = Task(
         description=(
             "Turn validated achievements into STAR-shaped statements with tech stack and business impact. "
-            f"Target {cfg['output']['bullets_count']} bullets. Keep ≤30 words each. Prefer %/ms/$/throughput/user metrics."
+            f"Target {cfg['output']['bullets_count']} bullets. Keep ≤30 words each. Prefer %/ms/$/throughput/user metrics. "
+            "Append a [Proof](<full-link>) where available; do NOT use placeholder domains. "
+            + base_instruction
         ),
         agent=agents["SynthesisAgent"],
         context=[attribution],

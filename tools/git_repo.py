@@ -59,3 +59,38 @@ def hot_files(commits, top_n=50):
             freq[f] += 1
     ranked = sorted(freq.items(), key=lambda x: x[1], reverse=True)
     return ranked[:top_n]
+
+def get_github_owner_repo(repo_path: str):
+    """Attempt to derive GitHub owner/repo from the git remote URL.
+
+    Supports SSH and HTTPS remotes, e.g.:
+    - git@github.com:owner/repo.git
+    - https://github.com/owner/repo.git
+    - https://github.com/owner/repo
+    Returns (owner, repo) or (None, None) if not found/parsable.
+    """
+    try:
+        repo = Repo(repo_path)
+        url = None
+        try:
+            url = next(repo.remote("origin").urls)
+        except Exception:
+            # No origin remote
+            return None, None
+        if not url:
+            return None, None
+        # Normalize
+        # SSH: git@github.com:owner/repo.git
+        m = re.match(r"git@github\.com:(?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?$", url)
+        if not m:
+            # HTTPS: https://github.com/owner/repo(.git)?
+            m = re.match(r"https?://github\.com/(?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?(?:/)?$", url)
+        if m:
+            owner = m.group("owner")
+            repo_name = m.group("repo")
+            # Strip .git if still present
+            repo_name = re.sub(r"\.git$", "", repo_name)
+            return owner, repo_name
+        return None, None
+    except Exception:
+        return None, None
