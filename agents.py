@@ -11,8 +11,8 @@ except Exception:
         from langchain.chat_models import ChatOpenAI  # legacy fallback
 
 def llm():
-    # Adjust model name as you wish
-    return ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+    # Deterministic output for stable formatting
+    return ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 def load_cfg():
     with open("config.yaml","r") as f:

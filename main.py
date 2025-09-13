@@ -5,62 +5,12 @@ from crewai import Crew, Process
 from agents import ResearchAgent, AttributionAgent, SynthesisAgent, BulletEditor
 from tasks import make_tasks
 from tools.git_repo import get_github_owner_repo
-
-def normalize_proof_links(text: str, owner: str, repo: str) -> str:
-    if not text or not owner or not repo:
-        return text
-    base = f"https://github.com/{owner}/{repo}/"
-    # Common placeholder bases used by LLMs or templates
-    placeholders = [
-        "https://github.com/project/repo/",
-        "https://github.com/your-org-or-username/your-repo-name/",
-        "https://github.com/org/repo/",
-        "https://github.com/owner/repo/",
-        "https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/",
-        "https://github.com/${owner}/${repo}/",
-        "https://github.com/<owner>/<repo>/",
-        "https://github.com/<ORG>/<REPO>/",
-    ]
-    for ph in placeholders:
-        text = text.replace(ph, base)
-    return text
-
-def sanitize_proof_links(text: str) -> str:
-    import re
-    if not text:
-        return text
-    def repl(m):
-        url = m.group(1)
-        # Accept commit links with hex sha and PR links with digits only
-        if "/commit/" in url:
-            sha = url.rsplit("/commit/", 1)[-1].split("/", 1)[0]
-            if re.fullmatch(r"[0-9a-fA-F]{7,40}", sha):
-                return m.group(0)
-            return ""  # drop invalid placeholder commit link
-        if "/pull/" in url:
-            num = url.rsplit("/pull/", 1)[-1].split("/", 1)[0]
-            if re.fullmatch(r"\d+", num):
-                return m.group(0)
-            return ""
-        # Unknown pattern; keep as-is
-        return m.group(0)
-    text = re.sub(r"\[Proof\]\(([^)]+)\)", repl, text)
-    # Collapse repeated spaces/tabs but keep newlines intact
-    text = re.sub(r"[ \t]{2,}", " ", text)
-    return text
-
-def remove_links(text: str) -> str:
-    """Remove all Markdown links and raw URLs to satisfy 'no links' output requirement."""
-    import re
-    if not text:
-        return text
-    # Remove [text](url) -> keep only text
-    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1", text)
-    # Remove bare URLs
-    text = re.sub(r"https?://\S+", "", text)
-    # Remove lingering 'Proof' tokens if any
-    text = text.replace("Proof:", "").replace("Proof", "")
-    return text
+from tools.formatting import (
+    normalize_proof_links,
+    sanitize_proof_links,
+    remove_links,
+    validate_and_autofix_sections,
+)
 
 def main():
     parser = argparse.ArgumentParser(description="Run Repo Insights CrewAI Assistant")
@@ -125,34 +75,38 @@ def main():
             # Section: Contribution Summary
             if summary:
                 title = "Impactful Contribution Summary"
-                para = (
-                    f"Based on git history, Kasra authored {summary.get('total_commits', 0)} commits "
-                    f"touching {summary.get('files_touched_count', 0)} files with +{summary.get('total_insertions', 0)}/"
-                    f"-{summary.get('total_deletions', 0)} line changes. This reflects sustained delivery and refactoring activity "
-                    f"across key areas of the codebase, indicating ownership of complex features and maintainability improvements."
+                bp = (
+                    f"Authored {summary.get('total_commits', 0)} commits across {summary.get('files_touched_count', 0)} files "
+                    f"(+{summary.get('total_insertions', 0)}/-{summary.get('total_deletions', 0)} LOC), reflecting sustained delivery."
                 )
-                sections.append((title, para))
+                desc = (
+                    f"Contributions span key modules, showing consistent feature delivery and refactoring. The breadth and depth of changes "
+                    f"point to end-to-end ownership and maintainability improvements across the codebase."
+                )
+                sections.append((title, bp, desc))
             # Section: Hot Files
             if hot:
                 title = "Ownership Across Hotspots"
                 hot_list = ", ".join(f"{os.path.basename(p)} ({n})" for p, n in hot)
-                para = (
-                    f"Frequent contributions cluster in high-churn areas: {hot_list}. These hotspots indicate focus on modules "
-                    f"that shape runtime behaviour and product surface area, suggesting iterative optimization and feature work grounded in real usage."
+                bp = f"High activity in hotspots: {hot_list}, indicating iterative optimization in critical paths."
+                desc = (
+                    f"Focus on high-churn modules that shape runtime behaviour and user-visible features suggests targeted improvements driven by usage. "
+                    f"This pattern aligns with steady hardening and performance tuning."
                 )
-                sections.append((title, para))
+                sections.append((title, bp, desc))
             # Section: Language Footprint
             if langs:
                 title = "Multi-Language Footprint"
                 ld = ", ".join(f"{k}:{v}" for k, v in sorted(langs.items()))
-                para = (
-                    f"Changes span multiple languages ({ld}), highlighting cross-layer work from APIs/services to data/infrastructure. "
-                    f"This breadth typically corresponds to end-to-end ownership of features and platform improvements."
+                bp = f"Cross-layer changes across languages ({ld}) demonstrate end-to-end ownership."
+                desc = (
+                    f"Work spans APIs/services and data/infrastructure layers, enabling coherent architectural decisions and integrated delivery. "
+                    f"This breadth improves cohesion and reduces handoffs."
                 )
-                sections.append((title, para))
+                sections.append((title, bp, desc))
             if not sections:
-                sections = [("No Signals Available", "Could not derive sections from local signals.")]
-            output_text += "\n\n".join([f"## {t}\n\n{p}" for t, p in sections])
+                sections = [("No Signals Available", "No summary", "Could not derive sections from local signals.")]
+            output_text += "\n\n".join([f"## {t}\n\nBullet Point: {bp}\n\nDescription: {d}" for t, bp, d in sections])
         except Exception:
             output_text += "\n\n## Offline Summary\n\nUnable to load signals.json to produce sections."
 
@@ -174,6 +128,7 @@ def main():
     output_text = normalize_proof_links(output_text, owner, repo)
     output_text = sanitize_proof_links(output_text)
     output_text = remove_links(output_text)
+    output_text = validate_and_autofix_sections(output_text)
 
     os.makedirs("output", exist_ok=True)
     output_file = os.path.join("output", f"{repo_slug}.md")
