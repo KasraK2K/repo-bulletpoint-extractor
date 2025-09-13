@@ -63,6 +63,7 @@ def collect_signals(verbose: bool = True):
 def make_tasks(agents, verbose: bool = True):
     cfg = load_cfg()
     signals = collect_signals(verbose=verbose)
+    person = cfg.get("you", {}).get("full_name", "the author")
 
     # Build a compact, grounded evidence blob to reduce hallucinations
     def _compact_signals(s):
@@ -85,7 +86,7 @@ def make_tasks(agents, verbose: bool = True):
 
     research = Task(
         description=(
-            "Analyze repo signals and list candidate achievements attributable to Kasra. "
+            f"Analyze repo signals and list candidate achievements attributable to {person}. "
             "Focus on: architecture decisions, performance/reliability wins, major features, tooling, CI/CD, security, data migrations, "
             "mentoring/reviews, cross-team leadership. Provide evidence snippets and metrics. "
             "Do not include links; capture commit/PR identifiers as plain text only if needed for context. "
@@ -101,10 +102,10 @@ def make_tasks(agents, verbose: bool = True):
     attribution = Task(
         description=(
             "From research JSON, validate authorship using commits_you, PRs authored/assigned, and review activity. "
-            "Boost confidence when Kasra authored most diffs or was assignee/reviewer on merged PRs. "
-            "Return top 10 achievements with confidence scores and concrete metrics or reasonable estimates. "
+            f"Boost confidence when {person} authored most diffs or was assignee/reviewer on merged PRs. "
+            f"Return top {cfg['output']['bullets_count']} achievements with confidence scores and concrete metrics or reasonable estimates. "
             "Do not include any hyperlinks. "
-            "Reject any achievement that lacks direct evidence (no matching files in signals or no commit shas authored by Kasra)."
+            f"Reject any achievement that lacks direct evidence (no matching files in signals or no commit shas authored by {person})."
         ),
         agent=agents["AttributionAgent"],
         context=[research],

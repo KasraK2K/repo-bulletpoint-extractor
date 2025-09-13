@@ -45,7 +45,6 @@ def main():
             ],
             tasks=tasks,
             process=Process.sequential,
-            memory=False,
         )
     else:
         # Offline mode: still collect signals for fallback output
@@ -82,9 +81,17 @@ def main():
             sections = []
             # Section: Contribution Summary
             if summary:
+                # Use configured name
+                try:
+                    import yaml as _yaml
+                    with open("config.yaml","r") as _f:
+                        _cfg = _yaml.safe_load(_f)
+                    _person = _cfg.get("you",{}).get("full_name","The author")
+                except Exception:
+                    _person = "The author"
                 title = "Impactful Contribution Summary"
                 bp = (
-                    f"Authored {summary.get('total_commits', 0)} commits across {summary.get('files_touched_count', 0)} files "
+                    f"{_person} authored {summary.get('total_commits', 0)} commits across {summary.get('files_touched_count', 0)} files "
                     f"(+{summary.get('total_insertions', 0)}/-{summary.get('total_deletions', 0)} LOC), reflecting sustained delivery."
                 )
                 desc = (

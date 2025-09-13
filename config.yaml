@@ -18,5 +18,5 @@ analysis:
   languages_of_interest: ["py","ts","tsx","js","go","java","kt","scala","rb","rs","cpp"]
 
 output:
-  bullets_count: 6
+  bullets_count: 20
   style: "senior_technical_lead"   # see prompts/styles.md

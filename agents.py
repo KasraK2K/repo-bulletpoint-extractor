@@ -25,10 +25,13 @@ def make_llm():
 
 
 def make_agents():
+    cfg = load_cfg()
+    person = cfg.get("you", {}).get("full_name", "the author")
+    role = cfg.get("you", {}).get("role", "Software Engineer")
     llm = make_llm()
     ResearchAgent = Agent(
         role="Repo Researcher",
-        goal="Collect high-quality signals about Kasra's contributions from code, commits, PRs, issues, and comments.",
+        goal=f"Collect high-quality signals about {person}'s contributions from code, commits, PRs, issues, and comments.",
         backstory="Experienced software archaeologist skilled at diffing, attributing authorship, and summarizing impact.",
         allow_delegation=False,
         llm=llm,
@@ -36,7 +39,7 @@ def make_agents():
 
     AttributionAgent = Agent(
         role="Authorship Attributor",
-        goal="Distinguish Kasra's contributions from others and estimate impact with concrete metrics.",
+        goal=f"Distinguish {person}'s contributions from others and estimate impact with concrete metrics.",
         backstory="Understands commit statistics, ownership heuristics, PR authorship, assignees, and review activity.",
         allow_delegation=False,
         llm=llm,
@@ -44,7 +47,7 @@ def make_agents():
 
     SynthesisAgent = Agent(
         role="Impact Synthesizer",
-        goal="Synthesize achievements into crisp STAR-shaped claims with quantifiable results.",
+        goal="Synthesize achievements into crisp, outcome-focused sections with quantifiable results.",
         backstory="Turns raw data into hard-hitting narrative statements oriented to outcomes and scale.",
         allow_delegation=False,
         llm=llm,
@@ -52,7 +55,7 @@ def make_agents():
 
     BulletEditor = Agent(
         role="CV Bullet Editor",
-        goal="Produce polished, de-duplicated bullet points that match the selected style.",
+        goal=f"Produce polished, grounded sections tailored for a {role}.",
         backstory="Seasoned CV editor for senior ICs and tech leads.",
         allow_delegation=False,
         llm=llm,
