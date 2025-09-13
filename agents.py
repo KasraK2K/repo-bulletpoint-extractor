@@ -21,7 +21,7 @@ def make_llm():
     """Create LLM only if OPENAI_API_KEY is present; else raise to allow offline mode."""
     if not os.getenv("OPENAI_API_KEY"):
         raise RuntimeError("OPENAI_API_KEY not set")
-    return ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+    return ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 
 def make_agents():
