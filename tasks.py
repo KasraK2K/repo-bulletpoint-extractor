@@ -117,8 +117,8 @@ def make_tasks(agents, verbose: bool = True):
             "Turn validated achievements into Markdown sections rather than a list. "
             f"Produce {cfg['output']['bullets_count']} sections. Each section MUST follow this exact template: \n"
             "## <Short, outcome-focused title>\n"
-            "Bullet Point: <one-sentence, punchy summary of the title and description; no leading dashes>\n"
-            "Description: <3–5 sentences explaining why this was written and how it happened in the repo: reference files/modules and scope; include metrics; no hyperlinks>\n"
+            "**Bullet Point:** <one-sentence, punchy summary of the title and description; no leading dashes> <br />\n"
+            "**Description:** <3–5 sentences explaining why this was written and how it happened in the repo: reference files/modules and scope; include metrics; no hyperlinks>\n"
             "No list items. No links. No raw URLs."
         ),
         agent=agents["SynthesisAgent"],
@@ -126,21 +126,21 @@ def make_tasks(agents, verbose: bool = True):
         expected_output=(
             "Markdown text with repeated sections strictly matching: \n"
             "## <Title>\n"
-            "Bullet Point: <one sentence>\n"
-            "Description: <3–5 sentences>\n"
+            "**Bullet Point:** <one sentence> <br />\n"
+            "**Description:** <3–5 sentences>\n"
         )
     )
 
     editing = Task(
         description=(
             "Polish sections per style config: strong titles, active voice, consistent terminology, and specific metrics. "
-            "Ensure each section matches the template exactly (H2, Bullet Point:, Description:). "
+            "Ensure each section matches the template exactly (H2, **Bullet Point:** … <br />, **Description:** …). "
             "Remove any hyperlinks and list formatting. Use prompts/bulletpoint_system.txt and prompts/styles.md."
         ),
         agent=agents["BulletEditor"],
         context=[synthesis],
         expected_output=(
-            "Final Markdown sections only (no lists): repeated blocks of '## <Title>', 'Bullet Point: ...', 'Description: ...'."
+            "Final Markdown sections only (no lists): repeated blocks of '## <Title>', '**Bullet Point:** ... <br />', '**Description:** ...'."
         )
     )
 

@@ -121,7 +121,7 @@ def main():
                 sections.append((title, bp, desc))
             if not sections:
                 sections = [("No Signals Available", "No summary", "Could not derive sections from local signals.")]
-            output_text += "\n\n".join([f"## {t}\n\nBullet Point: {bp}\n\nDescription: {d}" for t, bp, d in sections])
+            output_text += "\n\n".join([f"## {t}\n\n**Bullet Point:** {bp} <br />\n\n**Description:** {d}" for t, bp, d in sections])
         except Exception:
             output_text += "\n\n## Offline Summary\n\nUnable to load signals.json to produce sections."
 
