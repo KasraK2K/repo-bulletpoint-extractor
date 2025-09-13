@@ -64,15 +64,38 @@ def make_tasks(agents, verbose: bool = True):
     cfg = load_cfg()
     signals = collect_signals(verbose=verbose)
 
+    # Build a compact, grounded evidence blob to reduce hallucinations
+    def _compact_signals(s):
+        you = s.get("commits_you", [])[-100:]
+        commits = [{
+            "sha": c.get("hexsha", "")[:10],
+            "msg": (c.get("message", "") or "").split("\n", 1)[0][:140],
+            "files": c.get("files", [])[:10],
+        } for c in you]
+        return {
+            "summary_you": s.get("summary_you", {}),
+            "top_files_you": s.get("top_files_you", [])[:20],
+            "components": s.get("components", {}),
+            "languages": s.get("languages", {}),
+            "commits_you": commits,
+        }
+
+    import json as _json
+    evidence_blob = _json.dumps(_compact_signals(signals), ensure_ascii=False)
+
     research = Task(
         description=(
             "Analyze repo signals and list candidate achievements attributable to Kasra. "
             "Focus on: architecture decisions, performance/reliability wins, major features, tooling, CI/CD, security, data migrations, "
             "mentoring/reviews, cross-team leadership. Provide evidence snippets and metrics. "
-            "Do not include links; capture commit/PR identifiers as plain text only if needed for context."
+            "Do not include links; capture commit/PR identifiers as plain text only if needed for context. "
+            "Only use evidence from the provided signals; do not fabricate files or modules.\n\n"
+            f"Signals: {evidence_blob}"
         ),
         agent=agents["ResearchAgent"],
-        expected_output="A JSON with fields: achievements[], each has {title, evidence, metric_guess, files, time_window, area}"
+        expected_output=(
+            "A JSON with fields: achievements[], each has {title, evidence, metric_guess, files, time_window, area, evidence_paths[], commits[]}"
+        )
     )
 
     attribution = Task(
@@ -80,7 +103,8 @@ def make_tasks(agents, verbose: bool = True):
             "From research JSON, validate authorship using commits_you, PRs authored/assigned, and review activity. "
             "Boost confidence when Kasra authored most diffs or was assignee/reviewer on merged PRs. "
             "Return top 10 achievements with confidence scores and concrete metrics or reasonable estimates. "
-            "Do not include any hyperlinks."
+            "Do not include any hyperlinks. "
+            "Reject any achievement that lacks direct evidence (no matching files in signals or no commit shas authored by Kasra)."
         ),
         agent=agents["AttributionAgent"],
         context=[research],

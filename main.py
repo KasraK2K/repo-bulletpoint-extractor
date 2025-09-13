@@ -2,8 +2,7 @@ import os
 import argparse
 from dotenv import load_dotenv
 from crewai import Crew, Process
-from agents import ResearchAgent, AttributionAgent, SynthesisAgent, BulletEditor
-from tasks import make_tasks
+from tasks import make_tasks, collect_signals
 from tools.git_repo import get_github_owner_repo
 from tools.formatting import (
     normalize_proof_links,
@@ -30,25 +29,34 @@ def main():
     # Disable telemetry in restricted environments
     os.environ.setdefault("OTEL_SDK_DISABLED", "true")
     os.environ.setdefault("CREWAI_TELEMETRY_OPT_OUT", "true")
-    agents = {
-        "ResearchAgent": ResearchAgent,
-        "AttributionAgent": AttributionAgent,
-        "SynthesisAgent": SynthesisAgent,
-        "BulletEditor": BulletEditor
-    }
-    tasks, signals = make_tasks(agents, verbose=verbose)
-
-    crew = Crew(
-        agents=[ResearchAgent, AttributionAgent, SynthesisAgent, BulletEditor],
-        tasks=tasks,
-        process=Process.sequential,
-        memory=False
-    )
+    agents = None
+    crew = None
+    # Only initialize LLM agents if we have an API key
+    if os.getenv("OPENAI_API_KEY"):
+        from agents import make_agents  # lazy import to avoid requiring API key in offline mode
+        agents = make_agents()
+        tasks, signals = make_tasks(agents, verbose=verbose)
+        crew = Crew(
+            agents=[
+                agents["ResearchAgent"],
+                agents["AttributionAgent"],
+                agents["SynthesisAgent"],
+                agents["BulletEditor"],
+            ],
+            tasks=tasks,
+            process=Process.sequential,
+            memory=False,
+        )
+    else:
+        # Offline mode: still collect signals for fallback output
+        signals = collect_signals(verbose=verbose)
 
     if verbose:
         print("Initializing agents and tasks...", flush=True)
     # Attempt to run the crew; fall back to offline summary if environment blocks it
     try:
+        if crew is None:
+            raise RuntimeError("Offline mode: no LLM agents available")
         if verbose:
             print("Starting CrewAI pipeline (sequential)...", flush=True)
         result = crew.kickoff()
