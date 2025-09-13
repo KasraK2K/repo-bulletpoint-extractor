@@ -108,24 +108,35 @@ def make_tasks(agents, verbose: bool = True):
 
     synthesis = Task(
         description=(
-            "Turn validated achievements into STAR-shaped statements with tech stack and business impact. "
-            f"Target {cfg['output']['bullets_count']} bullets. Keep ≤30 words each. Prefer %/ms/$/throughput/user metrics. "
-            "Append a [Proof](<full-link>) where available; do NOT use placeholder domains. "
+            "Turn validated achievements into Markdown sections rather than a list. "
+            f"Produce {cfg['output']['bullets_count']} sections. Each section MUST be: \n"
+            "1) An H2 heading (##) with a crisp, outcome-focused title. \n"
+            "2) A concise explanation paragraph (3–5 sentences) explaining why this was written and how it happened in the repo: "
+            "reference specific commits/files/PRs, the change scope, the tech involved, and the measurable impact. "
+            "Include a [Proof](<full-link>) inside the explanation where applicable. "
+            "Prefer %/ms/$/throughput/incidents metrics. Do NOT output list items. "
             + base_instruction
         ),
         agent=agents["SynthesisAgent"],
         context=[attribution],
-        expected_output="List of concise bullet points (plain text, one per line)."
+        expected_output=(
+            "Markdown text with repeated sections: \n"
+            "## <Short, outcome-focused title>\n"
+            "<3–5 sentence explanation referencing repo evidence and including [Proof](link) when available>\n"
+        )
     )
 
     editing = Task(
         description=(
-            "Polish bullets per style config. Deduplicate, fix tense, unify terminology, and ensure measurability. "
-            "Use prompts/bulletpoint_system.txt and prompts/styles.md."
+            "Polish sections per style config: strong titles, active voice, consistent terminology, and specific metrics. "
+            "Ensure each section has exactly one H2 heading followed by a single explanatory paragraph (3–5 sentences). "
+            "Remove any list formatting. Use prompts/bulletpoint_system.txt and prompts/styles.md."
         ),
         agent=agents["BulletEditor"],
         context=[synthesis],
-        expected_output="Final bullets ready for CV (plain text list)."
+        expected_output=(
+            "Final Markdown sections only (no lists): repeated blocks of '## <Title>' followed by a single paragraph explanation."
+        )
     )
 
     return [research, attribution, synthesis, editing], signals

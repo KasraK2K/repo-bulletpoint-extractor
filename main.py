@@ -100,7 +100,7 @@ def main():
             "[Offline mode] Could not run full CrewAI pipeline. "
             "Generated a minimal summary from local signals instead.\n\n"
         )
-        # Use saved signals to craft simple bullets
+        # Use saved signals to craft simple Markdown sections (H2 + explanation)
         try:
             import json
             with open("output/signals.json","r") as sf:
@@ -108,26 +108,40 @@ def main():
             summary = signals.get("summary_you", {})
             hot = signals.get("top_files_you", [])[:5]
             langs = signals.get("languages", {})
-            bullets = []
+            sections = []
+            # Section: Contribution Summary
             if summary:
-                bullets.append(
-                    f"Authored {summary.get('total_commits', 0)} commits touching "
-                    f"{summary.get('files_touched_count', 0)} files with "
-                    f"+{summary.get('total_insertions', 0)}/-{summary.get('total_deletions', 0)} LOC changes."
+                title = "Impactful Contribution Summary"
+                para = (
+                    f"Based on git history, Kasra authored {summary.get('total_commits', 0)} commits "
+                    f"touching {summary.get('files_touched_count', 0)} files with +{summary.get('total_insertions', 0)}/"
+                    f"-{summary.get('total_deletions', 0)} line changes. This reflects sustained delivery and refactoring activity "
+                    f"across key areas of the codebase, indicating ownership of complex features and maintainability improvements."
                 )
+                sections.append((title, para))
+            # Section: Hot Files
             if hot:
-                bullets.append(
-                    "Top touched files: " + ", ".join(f"{p} ({n})" for p, n in hot)
+                title = "Ownership Across Hotspots"
+                hot_list = ", ".join(f"{os.path.basename(p)} ({n})" for p, n in hot)
+                para = (
+                    f"Frequent contributions cluster in high-churn areas: {hot_list}. These hotspots indicate focus on modules "
+                    f"that shape runtime behaviour and product surface area, suggesting iterative optimization and feature work grounded in real usage."
                 )
+                sections.append((title, para))
+            # Section: Language Footprint
             if langs:
-                bullets.append(
-                    "Language breakdown: " + ", ".join(f"{k}:{v}" for k, v in sorted(langs.items()))
+                title = "Multi-Language Footprint"
+                ld = ", ".join(f"{k}:{v}" for k, v in sorted(langs.items()))
+                para = (
+                    f"Changes span multiple languages ({ld}), highlighting cross-layer work from APIs/services to data/infrastructure. "
+                    f"This breadth typically corresponds to end-to-end ownership of features and platform improvements."
                 )
-            if not bullets:
-                bullets = ["No signals available to summarize."]
-            output_text += "\n".join(f"- {b}" for b in bullets)
+                sections.append((title, para))
+            if not sections:
+                sections = [("No Signals Available", "Could not derive sections from local signals.")]
+            output_text += "\n\n".join([f"## {t}\n\n{p}" for t, p in sections])
         except Exception:
-            output_text += "- Unable to load signals.json."
+            output_text += "\n\n## Offline Summary\n\nUnable to load signals.json to produce sections."
 
     # Derive repo name from REPO_PATH and write to output/{repo}.md with H1 header
     repo_path = os.getenv("REPO_PATH", ".")

@@ -6,7 +6,8 @@
 - Use metric + tech stack
 
 [senior_technical_lead]
-- 6–8 bullets
+- 6–8 sections
+- Each section: H2 title + one explanatory paragraph (3–5 sentences)
 - Mix architecture + delivery + org impact
-- Include 2 bullets on reliability/scalability
-- Include 1 bullet on mentoring/teams
+- Include 2 entries on reliability/scalability
+- Include 1 entry on mentoring/teams
