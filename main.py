@@ -49,6 +49,19 @@ def sanitize_proof_links(text: str) -> str:
     text = re.sub(r"[ \t]{2,}", " ", text)
     return text
 
+def remove_links(text: str) -> str:
+    """Remove all Markdown links and raw URLs to satisfy 'no links' output requirement."""
+    import re
+    if not text:
+        return text
+    # Remove [text](url) -> keep only text
+    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1", text)
+    # Remove bare URLs
+    text = re.sub(r"https?://\S+", "", text)
+    # Remove lingering 'Proof' tokens if any
+    text = text.replace("Proof:", "").replace("Proof", "")
+    return text
+
 def main():
     parser = argparse.ArgumentParser(description="Run Repo Insights CrewAI Assistant")
     vg = parser.add_mutually_exclusive_group()
@@ -160,6 +173,7 @@ def main():
     repo = (guess_repo or env_repo or "").strip()
     output_text = normalize_proof_links(output_text, owner, repo)
     output_text = sanitize_proof_links(output_text)
+    output_text = remove_links(output_text)
 
     os.makedirs("output", exist_ok=True)
     output_file = os.path.join("output", f"{repo_slug}.md")

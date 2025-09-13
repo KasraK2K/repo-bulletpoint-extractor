@@ -1,6 +1,6 @@
 import json, os, yaml
 from crewai import Task
-from tools.git_repo import load_git_history, contributions_by_user, summarize_impact, hot_files, get_github_owner_repo
+from tools.git_repo import load_git_history, contributions_by_user, summarize_impact, hot_files
 from tools.github_api import load_github_issues_prs
 from tools.code_scan import walk_code, language_breakdown, simple_component_detection
 
@@ -64,30 +64,12 @@ def make_tasks(agents, verbose: bool = True):
     cfg = load_cfg()
     signals = collect_signals(verbose=verbose)
 
-    # Determine GitHub base URL for proof links
-    repo_path = os.getenv("REPO_PATH", ".")
-    env_owner = os.getenv("GITHUB_OWNER", "").strip()
-    env_repo = os.getenv("GITHUB_REPO", "").strip()
-    guess_owner, guess_repo = get_github_owner_repo(repo_path)
-    owner = (guess_owner or env_owner or "").strip()
-    repo = (guess_repo or env_repo or "").strip()
-    if owner and repo:
-        github_base = f"https://github.com/{owner}/{repo}/"
-        base_instruction = (
-            f"Use full GitHub links with base {github_base} (commit/<hash> or pull/<number>)."
-        )
-    else:
-        github_base = ""
-        base_instruction = (
-            "Use full GitHub links to commits or PRs from the repository's GitHub remote; avoid placeholders."
-        )
-
     research = Task(
         description=(
             "Analyze repo signals and list candidate achievements attributable to Kasra. "
             "Focus on: architecture decisions, performance/reliability wins, major features, tooling, CI/CD, security, data migrations, "
             "mentoring/reviews, cross-team leadership. Provide evidence snippets and metrics. "
-            + base_instruction
+            "Do not include links; capture commit/PR identifiers as plain text only if needed for context."
         ),
         agent=agents["ResearchAgent"],
         expected_output="A JSON with fields: achievements[], each has {title, evidence, metric_guess, files, time_window, area}"
@@ -98,44 +80,42 @@ def make_tasks(agents, verbose: bool = True):
             "From research JSON, validate authorship using commits_you, PRs authored/assigned, and review activity. "
             "Boost confidence when Kasra authored most diffs or was assignee/reviewer on merged PRs. "
             "Return top 10 achievements with confidence scores and concrete metrics or reasonable estimates. "
-            "Include proof_links as full URLs to commits or PRs in the repository's GitHub. "
-            + base_instruction
+            "Do not include any hyperlinks."
         ),
         agent=agents["AttributionAgent"],
         context=[research],
-        expected_output=("JSON with fields: validated_achievements[] {title, impact, metrics, confidence, proof_links?, proof_snippets}")
+        expected_output="JSON with fields: validated_achievements[] {title, impact, metrics, confidence, proof_links?, proof_snippets}"
     )
 
     synthesis = Task(
         description=(
             "Turn validated achievements into Markdown sections rather than a list. "
-            f"Produce {cfg['output']['bullets_count']} sections. Each section MUST be: \n"
-            "1) An H2 heading (##) with a crisp, outcome-focused title. \n"
-            "2) A concise explanation paragraph (3–5 sentences) explaining why this was written and how it happened in the repo: "
-            "reference specific commits/files/PRs, the change scope, the tech involved, and the measurable impact. "
-            "Include a [Proof](<full-link>) inside the explanation where applicable. "
-            "Prefer %/ms/$/throughput/incidents metrics. Do NOT output list items. "
-            + base_instruction
+            f"Produce {cfg['output']['bullets_count']} sections. Each section MUST follow this exact template: \n"
+            "## <Short, outcome-focused title>\n"
+            "bullet-point: <one-sentence, punchy summary of the title and description; no leading dashes>\n"
+            "description: <3–5 sentences explaining why this was written and how it happened in the repo: reference files/modules and scope; include metrics; no hyperlinks>\n"
+            "No list items. No links. No raw URLs."
         ),
         agent=agents["SynthesisAgent"],
         context=[attribution],
         expected_output=(
-            "Markdown text with repeated sections: \n"
-            "## <Short, outcome-focused title>\n"
-            "<3–5 sentence explanation referencing repo evidence and including [Proof](link) when available>\n"
+            "Markdown text with repeated sections strictly matching: \n"
+            "## <Title>\n"
+            "bullet-point: <one sentence>\n"
+            "description: <3–5 sentences>\n"
         )
     )
 
     editing = Task(
         description=(
             "Polish sections per style config: strong titles, active voice, consistent terminology, and specific metrics. "
-            "Ensure each section has exactly one H2 heading followed by a single explanatory paragraph (3–5 sentences). "
-            "Remove any list formatting. Use prompts/bulletpoint_system.txt and prompts/styles.md."
+            "Ensure each section matches the template exactly (H2, bullet-point:, description:). "
+            "Remove any hyperlinks and list formatting. Use prompts/bullet-point_system.txt and prompts/styles.md."
         ),
         agent=agents["BulletEditor"],
         context=[synthesis],
         expected_output=(
-            "Final Markdown sections only (no lists): repeated blocks of '## <Title>' followed by a single paragraph explanation."
+            "Final Markdown sections only (no lists): repeated blocks of '## <Title>', 'bullet-point: ...', 'description: ...'."
         )
     )
 
