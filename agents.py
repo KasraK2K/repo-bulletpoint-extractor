@@ -1,6 +1,6 @@
 import os
-import yaml
 from crewai import Agent
+from utils.config import Config
 
 # Support multiple LangChain import paths for ChatOpenAI
 try:
@@ -12,11 +12,6 @@ except Exception:
         from langchain.chat_models import ChatOpenAI  # legacy fallback
 
 
-def load_cfg():
-    with open("config.yaml", "r") as f:
-        return yaml.safe_load(f)
-
-
 def make_llm():
     """Create LLM only if OPENAI_API_KEY is present; else raise to allow offline mode."""
     if not os.getenv("OPENAI_API_KEY"):
@@ -24,10 +19,12 @@ def make_llm():
     return ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 
-def make_agents():
-    cfg = load_cfg()
-    person = cfg.get("you", {}).get("full_name", "the author")
-    role = cfg.get("you", {}).get("role", "Software Engineer")
+def make_agents(config: Config = None):
+    if config is None:
+        config = Config()
+    
+    person = config.person_name
+    role = config.person_role
     llm = make_llm()
     ResearchAgent = Agent(
         role="Repo Researcher",
